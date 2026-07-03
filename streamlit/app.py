@@ -25,6 +25,8 @@ if "categorized" not in st.session_state:
 if "plan_finalized" not in st.session_state:
     st.session_state.plan_finalized = False
 
+GENERIC_ERROR_MSG = "Something went wrong processing your budget. Please try again."
+
 # FC endpoint
 FC_ENDPOINT = os.environ.get("FC_ENDPOINT", "https://your-fc-endpoint.cn-hangzhou.fc.aliyuncs.com")
 
@@ -156,7 +158,7 @@ if user_input:
         result = analyze_budget(transactions)
 
         if "error" in result:
-            response = "Something went wrong processing your budget. Please try again."
+            response = GENERIC_ERROR_MSG
         else:
             st.session_state.current_plan = result
             st.session_state.categorized = {
@@ -184,7 +186,7 @@ if user_input:
                 st.warning("The AI's response didn't make sense. Showing your previous plan.")
 
         if "error" in result:
-            response = "Something went wrong processing your budget. Please try again."
+            response = GENERIC_ERROR_MSG
         else:
             st.session_state.current_plan = result
             response = format_response(result)
@@ -195,13 +197,13 @@ if user_input:
     st.rerun()
 
 # Accept button (root level, after message loop)
-if st.session_state.current_plan and not st.session_state.get('plan_finalized', False):
+if st.session_state.current_plan and not st.session_state.plan_finalized:
     if st.button("✓ Accept this budget plan"):
         st.session_state.plan_finalized = True
         st.rerun()
 
 # Accepted state display + reset
-if st.session_state.get('plan_finalized', False):
+if st.session_state.plan_finalized:
     st.success("Budget plan accepted!")
     plan = st.session_state.current_plan
     st.markdown(f"**Final savings:** ${plan.get('savings', 0):,.2f}/mo")
