@@ -2,8 +2,7 @@
 import os
 import json
 import dashscope
-from dashscope import Generation
-from src.qwen_client import QwenAPIError, extract_json_from_response
+from src.qwen_client import QwenAPIError, extract_json_from_response, _call_qwen_with_retry
 
 dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
 
@@ -47,16 +46,10 @@ Respond in this exact JSON format:
 
 def _call_qwen_negotiation(prompt: str) -> dict:
     """Call Qwen API for negotiation. Raises QwenAPIError on failure."""
-    response = Generation.call(
+    response = _call_qwen_with_retry(
         model="qwen-turbo",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=1000,
-        timeout=30
     )
-
-    if response.status_code != 200:
-        raise QwenAPIError(f"Qwen API returned status {response.status_code}")
 
     return extract_json_from_response(response.output.text)
 

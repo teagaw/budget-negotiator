@@ -4,6 +4,20 @@
 
 Budget Negotiator is a hybrid AI agent that analyzes spending data and negotiates budget cuts through conversation. Unlike a spreadsheet, it reasons about tradeoffs on every turn using Qwen API.
 
+```mermaid
+graph LR
+    User[User] -->|Upload CSV / Chat| Streamlit[Streamlit UI]
+    Streamlit -->|HTTP POST| FC[FC Endpoint]
+    FC --> Rules[Rules Engine]
+    Rules -->|Parsed & Categorized| FC
+    FC --> Qwen[Qwen API]
+    Qwen -->|Budget Plan / Counter-Offer| FC
+    FC -->|JSON Response| Streamlit
+    Streamlit -->|Display Results| User
+```
+
+> *Figure 1: System architecture — data flows from user input through the rules engine and Qwen API, then back as a budget plan.*
+
 ## Components
 
 ### Streamlit UI

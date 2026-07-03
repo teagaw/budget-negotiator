@@ -22,7 +22,7 @@ def test_generate_counter_offer_calls_qwen():
     mock_response.status_code = 200
     mock_response.output.text = '{"cuts": {"entertainment": 50, "dining": 10}, "savings": 60, "explanation": "Reduced dining cut due to family visit"}'
 
-    with patch("src.negotiation.Generation.call", return_value=mock_response) as mock_call:
+    with patch("src.qwen_client.Generation.call", return_value=mock_response) as mock_call:
         result = generate_counter_offer(categorized, previous_plan, user_objection)
 
         # Verify Qwen was called with the user's objection
@@ -58,7 +58,7 @@ def test_generate_counter_offer_api_status_error_returns_fallback():
     mock_response.status_code = 429
     mock_response.output.text = ""
 
-    with patch("src.negotiation.Generation.call", return_value=mock_response):
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
         result = generate_counter_offer(categorized, previous_plan, "hello")
 
     assert result.get("fallback") is True
@@ -73,7 +73,7 @@ def test_generate_counter_offer_invalid_json_returns_fallback():
     mock_response.status_code = 200
     mock_response.output.text = "not json at all"
 
-    with patch("src.negotiation.Generation.call", return_value=mock_response):
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
         result = generate_counter_offer(categorized, previous_plan, "test")
 
     assert result.get("fallback") is True

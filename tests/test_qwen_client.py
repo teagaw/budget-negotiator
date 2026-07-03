@@ -113,6 +113,29 @@ def test_get_budget_recommendation_api_error():
             get_budget_recommendation(cats, "auto")
 
 
+def test_retry_on_transient_503_then_success():
+    """First call returns 503, second returns 200 — retry succeeds."""
+    cats = CategorizedTransactions(
+        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
+    )
+
+    error_response = MagicMock()
+    error_response.status_code = 503
+
+    ok_response = MagicMock()
+    ok_response.status_code = 200
+    ok_response.output.text = '{"cuts": {"food": 50}, "savings": 50, "explanation": "Cut food"}'
+
+    with patch("src.qwen_client.Generation.call", side_effect=[error_response, ok_response]):
+        with patch("src.qwen_client.time.sleep") as mock_sleep:
+            result = get_budget_recommendation(cats, "auto")
+
+    mock_sleep.assert_called_once_with(1)
+    assert result["savings"] == 50
+    assert result["original_spending"] == 1500
+    assert result["proposed_spending"] == 1450
+
+
 @pytest.mark.parametrize("goal,expected_str", [
     ("auto", "save as much as possible"),
     (250, "$250"),

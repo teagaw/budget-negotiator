@@ -26,7 +26,7 @@ def test_negotiate_response_shape_matches_handler():
     mock_response.status_code = 200
     mock_response.output.text = '{"cuts": {"food": 50}, "savings": 50, "explanation": "Adjusted"}'
 
-    with patch("src.negotiation.Generation.call", return_value=mock_response):
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
         result = generate_counter_offer(categorized, previous_plan, "test")
 
     # These keys MUST exist at top level (not nested under "savings.plan")

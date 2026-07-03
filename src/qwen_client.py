@@ -1,6 +1,7 @@
 # src/qwen_client.py
 import os
 import json
+import time
 import dashscope
 from dashscope import Generation
 from src.models import CategorizedTransactions, BudgetPlan
@@ -77,6 +78,41 @@ def parse_recommendation(raw_response: str, original_total: float) -> BudgetPlan
         )
 
 
+TRANSIENT_STATUS_CODES = {429, 500, 502, 503}
+
+
+def _call_qwen_with_retry(
+    model: str,
+    messages: list,
+    temperature: float = 0.7,
+    max_tokens: int = 1000,
+    timeout: int = 30,
+):
+    """Call Generation.call() with a single retry on transient errors."""
+    response = Generation.call(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=timeout,
+    )
+
+    if response.status_code in TRANSIENT_STATUS_CODES:
+        time.sleep(1)
+        response = Generation.call(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+        )
+
+    if response.status_code != 200:
+        raise QwenAPIError(f"Qwen API returned status {response.status_code}")
+
+    return response
+
+
 def get_budget_recommendation(
     categorized_transactions: CategorizedTransactions,
     savings_goal
@@ -84,16 +120,10 @@ def get_budget_recommendation(
     """Call Qwen API and return structured recommendation."""
     prompt = build_prompt(categorized_transactions, savings_goal)
 
-    response = Generation.call(
+    response = _call_qwen_with_retry(
         model="qwen-turbo",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=1000,
-        timeout=30
     )
-
-    if response.status_code != 200:
-        raise QwenAPIError(f"Qwen API returned status {response.status_code}")
 
     plan = parse_recommendation(response.output.text, categorized_transactions.total)
 

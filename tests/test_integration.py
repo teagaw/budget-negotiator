@@ -53,7 +53,7 @@ def test_negotiation_flow():
     mock_response.status_code = 200
     mock_response.output.text = '{"cuts": {"entertainment": 20}, "savings": 20, "explanation": "Reduced as requested"}'
 
-    with patch("src.negotiation.Generation.call", return_value=mock_response):
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
         result = generate_counter_offer(categorized, previous_plan, "I need entertainment for work")
         assert result["cuts"]["entertainment"] == 20
         assert "Reduced" in result["explanation"]

@@ -33,6 +33,10 @@ AI-powered budget analysis and negotiation agent. Upload your spending data, and
 4. Upload your spending CSV or use demo data
 5. Type "analyze" to start
 
+## Tests
+
+70 tests · 100% coverage — `pytest tests/`
+
 ## Deployment
 
 Deployed on Alibaba Cloud Function Compute.
@@ -41,7 +45,7 @@ See `src/handler.py` for the FC entry point.
 ## Demo Data
 
 Two synthetic profiles included:
-- Middle Class ($1,580/mo) — rent, utilities, groceries, subscriptions
+- Middle Class ($2,180/mo) — rent, utilities, groceries, subscriptions
 - Young Professional ($1,740/mo) — studio apartment, meal prep, streaming
 
 ## License
