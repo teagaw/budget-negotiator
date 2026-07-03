@@ -19,7 +19,9 @@
 
 ## 1:50-2:30 — Live demo (negotiation)
 [Show rejection → Qwen reasoning → counter-offer]
-"But what if I push back? 'I can't cut dining that much, parents are visiting next month.' Watch — the agent reads my objection, understands the context, and adjusts. It reduces the dining cut and finds savings elsewhere. Every turn, it's reasoning about tradeoffs."
+"But what if I push back? 'I can't cut dining that much, parents are visiting next month.' Watch — the agent reads my objection, understands the context, and adjusts. It reduces the dining cut and finds savings elsewhere."
+[Type vague objection: "just save me more somehow"]
+"Even when I type something vague — 'just save me more somehow' — the agent doesn't crash. It reasons about what that means given the current plan, and proposes a revised breakdown. Every turn, it's reasoning about tradeoffs."
 
 ## 2:30-2:50 — Why it's not just a spreadsheet
 "A spreadsheet can subtract numbers. This agent reasons about tradeoffs on every turn. It knows essentials come first. It adapts when you push back. It learns your priorities through conversation."
