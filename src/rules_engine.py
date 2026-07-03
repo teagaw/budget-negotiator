@@ -9,17 +9,33 @@ class ValidationError(Exception):
 
 
 def validate_transactions(transactions: list) -> list:
-    """Validate and clean transaction data."""
+    """Validate transaction data. Raises ValidationError with details on bad rows."""
     valid = []
-    for t in transactions:
+    dropped = []
+
+    for i, t in enumerate(transactions):
         if not isinstance(t, dict):
+            dropped.append({"row": i + 1, "reason": "not a dict"})
             continue
         amount = t.get("amount")
-        if amount is None or not isinstance(amount, (int, float)):
+        if amount is None:
+            dropped.append({"row": i + 1, "reason": "missing amount"})
+            continue
+        if not isinstance(amount, (int, float)):
+            dropped.append({"row": i + 1, "reason": f"non-numeric amount: {amount}"})
             continue
         if float(amount) < 0:
+            dropped.append({"row": i + 1, "reason": f"negative amount: {amount}"})
             continue
         valid.append(t)
+
+    if dropped:
+        raise ValidationError(
+            f"{len(dropped)} invalid row(s) dropped: "
+            + "; ".join(f"row {d['row']}: {d['reason']}" for d in dropped[:5])
+            + ("..." if len(dropped) > 5 else "")
+        )
+
     return valid
 
 

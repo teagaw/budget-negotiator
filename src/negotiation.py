@@ -75,13 +75,17 @@ def generate_counter_offer(
     try:
         parsed_response = _call_qwen_negotiation(prompt)
 
+        original_spending = categorized.get("total", 0)
+        savings = parsed_response.get("savings", 0)
+
         return {
             "cuts": parsed_response.get("cuts", {}),
-            "savings": parsed_response.get("savings", 0),
+            "savings": savings,
+            "proposed_spending": original_spending - savings,
             "explanation": parsed_response.get("explanation", ""),
             "essential": categorized.get("essential", {}),
             "discretionary": categorized.get("discretionary", {}),
-            "original_spending": categorized.get("total", 0)
+            "original_spending": original_spending
         }
 
     except (QwenAPIError, json.JSONDecodeError, KeyError) as e:

@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 st.set_page_config(page_title="Budget Negotiator", layout="wide")
 st.title("Budget Negotiator")
 st.caption("AI-powered budget analysis and negotiation")
@@ -146,7 +148,7 @@ if user_input:
             transactions = df.to_dict("records")
         else:
             profile_file = "middle-class.csv" if "Middle" in demo_profile else "young-professional.csv"
-            transactions = pd.read_csv(f"docs/demo-data/{profile_file}").to_dict("records")
+            transactions = pd.read_csv(os.path.join(BASE_DIR, "docs", "demo-data", profile_file)).to_dict("records")
 
         result = analyze_budget(transactions)
 
