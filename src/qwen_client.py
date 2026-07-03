@@ -1,79 +1,118 @@
-"""
-Qwen API client for budget negotiation reasoning.
-This module handles all Qwen Cloud API interactions.
-"""
+# src/qwen_client.py
 import os
+import json
 import dashscope
 from dashscope import Generation
-from typing import Dict, Any, List
+from src.models import CategorizedTransactions, BudgetPlan
+
+# Load API key from environment
+dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+
+
+def build_prompt(categorized: CategorizedTransactions, savings_goal) -> str:
+    """Build the initial negotiation prompt for Qwen."""
+    goal_text = (
+        f"The user wants to save ${savings_goal} per month."
+        if savings_goal != "auto"
+        else "The user wants to save as much as possible without hurting essentials."
+    )
+
+    prompt = f"""You are a budget negotiator. Analyze this spending and propose cuts.
+
+MONTHLY SPENDING:
+Essential: {json.dumps(categorized.essential, indent=2)}
+Discretionary: {json.dumps(categorized.discretionary, indent=2)}
+Total: ${categorized.total:.2f}
+
+GOAL: {goal_text}
+
+RULES:
+1. Never cut essentials below survival level
+2. Cut discretionary spending first (entertainment, dining, shopping)
+3. Propose specific dollar amounts per category
+4. Explain your reasoning clearly
+
+Respond in this exact JSON format:
+{{
+    "cuts": {{"category": dollar_amount}},
+    "savings": total_monthly_savings,
+    "explanation": "Your explanation here"
+}}"""
+
+    return prompt
+
+
+def parse_recommendation(raw_response: str, original_total: float) -> BudgetPlan:
+    """Parse Qwen's response into a BudgetPlan."""
+    try:
+        # Extract JSON from response
+        start = raw_response.find("{")
+        end = raw_response.rfind("}") + 1
+        data = json.loads(raw_response[start:end])
+
+        cuts = data.get("cuts", {})
+        savings = data.get("savings", 0)
+        explanation = data.get("explanation", "")
+
+        return BudgetPlan(
+            original_spending=original_total,
+            proposed_spending=original_total - savings,
+            savings=savings,
+            cuts=cuts,
+            explanation=explanation
+        )
+    except (json.JSONDecodeError, ValueError):
+        return BudgetPlan(
+            original_spending=original_total,
+            proposed_spending=original_total,
+            savings=0,
+            cuts={},
+            explanation="Failed to parse recommendation. Please try again."
+        )
 
 
 def get_budget_recommendation(
-    categorized_transactions: Dict[str, List[Dict[str, Any]]],
-    savings_goal: str = "auto"
-) -> Dict[str, Any]:
-    """
-    Get budget recommendation using Qwen API.
-    
-    Args:
-        categorized_transactions: Transactions grouped by category
-        savings_goal: Target savings goal (or "auto" for automatic)
-        
-    Returns:
-        Dictionary with budget recommendation
-    """
-    # Build prompt for Qwen
-    prompt = f"""Analyze these categorized transactions and provide budget recommendations:
-{categorized_transactions}
+    categorized_transactions: CategorizedTransactions,
+    savings_goal
+) -> dict:
+    """Call Qwen API and return structured recommendation."""
+    prompt = build_prompt(categorized_transactions, savings_goal)
 
-Savings goal: {savings_goal}
+    try:
+        response = Generation.call(
+            model="qwen-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=1000,
+            timeout=30
+        )
 
-Please provide:
-1. Total spending by category
-2. Top 3 categories to cut
-3. Specific dollar amounts to reduce
-4. Estimated monthly savings"""
-    
-    response = Generation.call(
-        model="qwen-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    
-    return {
-        "recommendation": response.output.text,
-        "savings_goal": savings_goal,
-        "categories_analyzed": list(categorized_transactions.keys())
-    }
+        if response.status_code != 200:
+            return {
+                "error": "Qwen API timeout or error",
+                "fallback": True,
+                "original_total": categorized_transactions.total,
+                "essential": categorized_transactions.essential,
+                "discretionary": categorized_transactions.discretionary
+            }
 
+        plan = parse_recommendation(response.output.text, categorized_transactions.total)
 
-def get_counter_offer(
-    categorized: Dict[str, List[Dict[str, Any]]],
-    previous_plan: Dict[str, Any],
-    user_objection: str
-) -> Dict[str, Any]:
-    """
-    Generate a counter-offer during negotiation using Qwen API.
-    
-    Args:
-        categorized: Current categorized transactions
-        previous_plan: The previous budget plan
-        user_objection: User's objection to the plan
-        
-    Returns:
-        Dictionary with counter-offer
-    """
-    prompt = f"""Previous budget plan: {previous_plan}
-User objection: {user_objection}
-Current spending: {categorized}
+        return {
+            "original_spending": plan.original_spending,
+            "proposed_spending": plan.proposed_spending,
+            "savings": plan.savings,
+            "cuts": plan.cuts,
+            "explanation": plan.explanation,
+            "essential": categorized_transactions.essential,
+            "discretionary": categorized_transactions.discretionary
+        }
 
-Generate a counter-offer that addresses the user's objection while maintaining savings goals."""
-    
-    response = Generation.call(
-        model="qwen-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    
-    return {
-        "counter_offer": response.output.text,
-        "addresses_objection": user_objection
-    }
+    except Exception as e:
+        return {
+            "error": f"Qwen API timeout: {str(e)}",
+            "fallback": True,
+            "original_total": categorized_transactions.total,
+            "essential": categorized_transactions.essential,
+            "discretionary": categorized_transactions.discretionary
+        }
