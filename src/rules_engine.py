@@ -3,6 +3,11 @@ from typing import List, Dict, Any
 from src.models import Transaction, CategorizedTransactions
 
 
+class ValidationError(Exception):
+    """Raised when transaction data is invalid."""
+    pass
+
+
 def validate_transactions(transactions: list) -> list:
     """Validate and clean transaction data."""
     valid = []
@@ -32,7 +37,6 @@ def parse_transactions(raw_data: List[Dict[str, Any]]) -> List[Transaction]:
 
 
 ESSENTIAL_CATEGORIES = {"rent", "utilities", "insurance", "healthcare", "transport"}
-DISCRETIONARY_CATEGORIES = {"food", "entertainment", "dining", "shopping", "personal"}
 
 
 def categorize_transactions(transactions: List[Transaction]) -> CategorizedTransactions:
@@ -41,14 +45,14 @@ def categorize_transactions(transactions: List[Transaction]) -> CategorizedTrans
     discretionary = {}
     total = 0.0
 
-    for t in transactions:
-        total += t.amount
-        cat_lower = t.category.lower()
+    for txn in transactions:
+        total += txn.amount
+        cat_lower = txn.category.lower()
 
         if cat_lower in ESSENTIAL_CATEGORIES:
-            essential[cat_lower] = essential.get(cat_lower, 0) + t.amount
+            essential[cat_lower] = essential.get(cat_lower, 0) + txn.amount
         else:
-            discretionary[cat_lower] = discretionary.get(cat_lower, 0) + t.amount
+            discretionary[cat_lower] = discretionary.get(cat_lower, 0) + txn.amount
 
     return CategorizedTransactions(
         essential=essential,

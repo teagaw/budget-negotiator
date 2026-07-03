@@ -5,13 +5,57 @@ Demonstrates real Qwen Cloud API usage for budget negotiation.
 import os
 import json
 import dashscope
-from dashscope import Generation
-from src.rules_engine import parse_transactions, categorize_transactions
-from src.qwen_client import get_budget_recommendation
+from src.rules_engine import parse_transactions, categorize_transactions, ValidationError
+from src.qwen_client import get_budget_recommendation, QwenAPIError
 from src.negotiation import generate_counter_offer
 
 # Load API key from environment (set in FC console or .env for local)
 dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+
+
+def _handle_analyze(body: dict) -> dict:
+    """Process initial budget analysis request."""
+    transactions = body.get("transactions", [])
+    savings_goal = body.get("savings_goal", "auto")
+
+    if not transactions:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "No transactions provided"})
+        }
+
+    parsed = parse_transactions(transactions)
+    categorized = categorize_transactions(parsed)
+
+    recommendation = get_budget_recommendation(
+        categorized_transactions=categorized,
+        savings_goal=savings_goal
+    )
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(recommendation)
+    }
+
+
+def _handle_negotiate(body: dict) -> dict:
+    """Process negotiation request with Qwen-powered counter-offer."""
+    categorized = body.get("categorized")
+    previous_plan = body.get("previous_plan")
+    user_objection = body.get("user_objection", "")
+
+    if not categorized or not previous_plan:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "Missing negotiation context"})
+        }
+
+    counter = generate_counter_offer(categorized, previous_plan, user_objection)
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(counter)
+    }
 
 
 def handler(event, context):
@@ -24,57 +68,27 @@ def handler(event, context):
         action = body.get("action", "analyze")
 
         if action == "analyze":
-            transactions = body.get("transactions", [])
-            savings_goal = body.get("savings_goal", "auto")
-
-            if not transactions:
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "No transactions provided"})
-                }
-
-            # Step 1: Rules engine — parse and categorize
-            parsed = parse_transactions(transactions)
-            categorized = categorize_transactions(parsed)
-
-            # Step 2: Qwen API — reason about cuts
-            recommendation = get_budget_recommendation(
-                categorized_transactions=categorized,
-                savings_goal=savings_goal
-            )
-
-            return {
-                "statusCode": 200,
-                "body": json.dumps(recommendation)
-            }
-
+            return _handle_analyze(body)
         elif action == "negotiate":
-            # New: Qwen-powered negotiation on every turn
-            categorized = body.get("categorized")
-            previous_plan = body.get("previous_plan")
-            user_objection = body.get("user_objection", "")
-
-            if not categorized or not previous_plan:
-                return {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "Missing negotiation context"})
-                }
-
-            counter = generate_counter_offer(categorized, previous_plan, user_objection)
-
-            return {
-                "statusCode": 200,
-                "body": json.dumps(counter)
-            }
-
+            return _handle_negotiate(body)
         else:
             return {
                 "statusCode": 400,
                 "body": json.dumps({"error": f"Unknown action: {action}"})
             }
 
-    except Exception as e:
+    except json.JSONDecodeError:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "Invalid JSON in request body"})
+        }
+    except (ValidationError, QwenAPIError) as e:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": str(e)})
+        }
+    except Exception:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Internal server error"})
         }

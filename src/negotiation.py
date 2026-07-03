@@ -3,20 +3,18 @@ import os
 import json
 import dashscope
 from dashscope import Generation
+from src.qwen_client import QwenAPIError, extract_json_from_response
 
 dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
 
 
-def generate_counter_offer(
+def _build_negotiation_prompt(
     categorized: dict,
     previous_plan: dict,
     user_objection: str
-) -> dict:
-    """
-    Generate counter-offer using Qwen API on EVERY turn.
-    No local arithmetic — the LLM reasons about the tradeoff.
-    """
-    prompt = f"""You are a budget negotiator in a conversation with a user.
+) -> str:
+    """Build the negotiation prompt for Qwen."""
+    return f"""You are a budget negotiator in a conversation with a user.
 
 ORIGINAL SPENDING DATA:
 Essential: {json.dumps(categorized.get("essential", {}), indent=2)}
@@ -46,37 +44,53 @@ Respond in this exact JSON format:
     "explanation": "Your explanation acknowledging their feedback and your adjustment"
 }}"""
 
+
+def _call_qwen_negotiation(prompt: str) -> dict:
+    """Call Qwen API for negotiation. Raises QwenAPIError on failure."""
+    response = Generation.call(
+        model="qwen-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=1000,
+        timeout=30
+    )
+
+    if response.status_code != 200:
+        raise QwenAPIError(f"Qwen API returned status {response.status_code}")
+
+    return extract_json_from_response(response.output.text)
+
+
+def generate_counter_offer(
+    categorized: dict,
+    previous_plan: dict,
+    user_objection: str
+) -> dict:
+    """
+    Generate counter-offer using Qwen API on EVERY turn.
+    No local arithmetic — the LLM reasons about the tradeoff.
+    """
+    prompt = _build_negotiation_prompt(categorized, previous_plan, user_objection)
+
     try:
-        response = Generation.call(
-            model="qwen-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=1000,
-            timeout=30
-        )
-
-        if response.status_code != 200:
-            # Fallback: return previous plan unchanged
-            return previous_plan
-
-        # Parse Qwen's response
-        raw = response.output.text
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        data = json.loads(raw[start:end])
+        parsed_response = _call_qwen_negotiation(prompt)
 
         return {
-            "cuts": data.get("cuts", {}),
-            "savings": data.get("savings", 0),
-            "explanation": data.get("explanation", ""),
+            "cuts": parsed_response.get("cuts", {}),
+            "savings": parsed_response.get("savings", 0),
+            "explanation": parsed_response.get("explanation", ""),
             "essential": categorized.get("essential", {}),
             "discretionary": categorized.get("discretionary", {}),
             "original_spending": categorized.get("total", 0)
         }
 
-    except Exception:
-        # On any error, return previous plan unchanged
-        return previous_plan
+    except (QwenAPIError, json.JSONDecodeError, KeyError) as e:
+        # Propagate error to caller instead of silently swallowing
+        return {
+            "error": f"Negotiation failed: {str(e)}",
+            "fallback": True,
+            **previous_plan
+        }
 
 
 def format_budget_breakdown(plan: dict) -> str:
