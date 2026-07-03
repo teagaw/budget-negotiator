@@ -1,0 +1,1 @@
+# budget-negotiator tests package
