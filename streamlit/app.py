@@ -6,6 +6,7 @@ import plotly.express as px
 import requests
 import json
 from dotenv import load_dotenv
+from src.negotiation import validate_ambiguity
 
 load_dotenv()
 
@@ -178,10 +179,7 @@ if user_input:
 
         # Sanity check for ambiguous input responses
         if "error" not in result:
-            original = st.session_state.categorized.get("total", 0)
-            savings = result.get("savings", 0)
-            proposed = result.get("proposed_spending", 0)
-            if savings > original or proposed < 0:
+            if not validate_ambiguity(st.session_state.categorized, result):
                 result = st.session_state.current_plan
                 st.warning("The AI's response didn't make sense. Showing your previous plan.")
 

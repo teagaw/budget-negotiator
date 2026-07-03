@@ -97,6 +97,15 @@ def generate_counter_offer(
         }
 
 
+def validate_ambiguity(categorized: dict, plan: dict) -> bool:
+    """Sanity check for ambiguous input responses.
+    Returns True if plan is valid, False if nonsensical."""
+    original = categorized.get("total", 0)
+    savings = plan.get("savings", 0)
+    proposed = plan.get("proposed_spending", 0)
+    return savings < original and proposed > 0
+
+
 def format_budget_breakdown(plan: dict) -> str:
     """Format budget plan as readable text."""
     lines = [
