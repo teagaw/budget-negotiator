@@ -7,7 +7,8 @@ import json
 import dashscope
 from dashscope import Generation
 from src.rules_engine import parse_transactions, categorize_transactions
-from src.qwen_client import get_budget_recommendation, get_counter_offer
+from src.qwen_client import get_budget_recommendation
+from src.negotiation import generate_counter_offer
 
 # Load API key from environment (set in FC console or .env for local)
 dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
@@ -59,7 +60,7 @@ def handler(event, context):
                     "body": json.dumps({"error": "Missing negotiation context"})
                 }
 
-            counter = get_counter_offer(categorized, previous_plan, user_objection)
+            counter = generate_counter_offer(categorized, previous_plan, user_objection)
 
             return {
                 "statusCode": 200,
