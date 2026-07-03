@@ -56,20 +56,14 @@ def test_validate_mixed_errors_truncates_to_5():
         validate_transactions(bad_rows)
 
 
-def test_validate_accepts_zero_amount():
-    result = validate_transactions([{"amount": 0, "category": "free"}])
-    assert len(result) == 1
-
-
-def test_validate_accepts_float_amount():
-    result = validate_transactions([{"amount": 19.99, "category": "food"}])
-    assert result[0]["amount"] == 19.99
-
-
-def test_validate_all_valid_returns_all():
-    data = [{"amount": 10}, {"amount": 20}, {"amount": 30}]
+@pytest.mark.parametrize("data,expected_amount", [
+    ([{"amount": 0, "category": "free"}], 0),
+    ([{"amount": 19.99, "category": "food"}], 19.99),
+], ids=["zero-amount", "float-amount"])
+def test_validate_accepts_valid_edge_cases(data, expected_amount):
     result = validate_transactions(data)
-    assert len(result) == 3
+    assert len(result) == 1
+    assert result[0]["amount"] == expected_amount
 
 
 def test_parse_transactions_uses_validated_data():

@@ -1,5 +1,6 @@
 # tests/test_qwen_client.py
 import json
+import pytest
 from unittest.mock import patch, MagicMock
 from src.qwen_client import (
     build_prompt, parse_recommendation, extract_json_from_response,
@@ -80,8 +81,8 @@ def test_parse_recommendation_missing_fields_uses_defaults():
 
 # --- get_budget_recommendation ---
 
-def test_get_budget_recommendation_success():
-    from src.models import CategorizedTransactions
+@pytest.mark.parametrize("goal", ["auto", 200], ids=["auto-goal", "numeric-goal"])
+def test_get_budget_recommendation_success(goal):
     cats = CategorizedTransactions(
         essential={"rent": 1200}, discretionary={"food": 300}, total=1500
     )
@@ -90,7 +91,7 @@ def test_get_budget_recommendation_success():
     mock_response.output.text = '{"cuts": {"food": 100}, "savings": 100, "explanation": "Cut food"}'
 
     with patch("src.qwen_client.Generation.call", return_value=mock_response):
-        result = get_budget_recommendation(cats, "auto")
+        result = get_budget_recommendation(cats, goal)
 
     assert result["savings"] == 100
     assert result["original_spending"] == 1500
@@ -100,7 +101,6 @@ def test_get_budget_recommendation_success():
 
 
 def test_get_budget_recommendation_api_error():
-    from src.models import CategorizedTransactions
     cats = CategorizedTransactions(
         essential={"rent": 1200}, discretionary={}, total=1200
     )
@@ -109,39 +109,17 @@ def test_get_budget_recommendation_api_error():
     mock_response.status_code = 500
 
     with patch("src.qwen_client.Generation.call", return_value=mock_response):
-        import pytest
         with pytest.raises(QwenAPIError):
             get_budget_recommendation(cats, "auto")
 
 
-def test_get_budget_recommendation_with_numeric_goal():
-    from src.models import CategorizedTransactions
+@pytest.mark.parametrize("goal,expected_str", [
+    ("auto", "save as much as possible"),
+    (250, "$250"),
+], ids=["auto-goal", "numeric-goal"])
+def test_build_prompt_includes_goal_text(goal, expected_str):
     cats = CategorizedTransactions(
         essential={"rent": 1200}, discretionary={"food": 300}, total=1500
     )
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.output.text = '{"cuts": {"food": 100}, "savings": 100, "explanation": "Cut food"}'
-
-    with patch("src.qwen_client.Generation.call", return_value=mock_response):
-        result = get_budget_recommendation(cats, 200)
-
-    assert result["savings"] == 100
-
-
-def test_build_prompt_auto_goal():
-    from src.models import CategorizedTransactions
-    cats = CategorizedTransactions(
-        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
-    )
-    prompt = build_prompt(cats, "auto")
-    assert "save as much as possible" in prompt.lower()
-
-
-def test_build_prompt_numeric_goal():
-    from src.models import CategorizedTransactions
-    cats = CategorizedTransactions(
-        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
-    )
-    prompt = build_prompt(cats, 250)
-    assert "$250" in prompt
+    prompt = build_prompt(cats, goal)
+    assert expected_str in prompt.lower() if isinstance(expected_str, str) else expected_str in prompt
