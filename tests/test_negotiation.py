@@ -1,6 +1,7 @@
 # tests/test_negotiation.py
 from unittest.mock import patch, MagicMock
 from src.negotiation import generate_counter_offer, format_budget_breakdown
+from src.qwen_client import QwenAPIError
 
 
 def test_generate_counter_offer_calls_qwen():
@@ -33,6 +34,49 @@ def test_generate_counter_offer_calls_qwen():
         assert result["savings"] == 60
         assert result["cuts"]["dining"] == 10
         assert "family visit" in result["explanation"]
+
+
+def test_generate_counter_offer_qwen_error_returns_fallback():
+    """QwenAPIError returns fallback plan, not crash."""
+    categorized = {"essential": {"rent": 1200}, "discretionary": {}, "total": 1200}
+    previous_plan = {"cuts": {"food": 50}, "savings": 50, "explanation": "Initial"}
+
+    with patch("src.negotiation._call_qwen_negotiation", side_effect=QwenAPIError("API down")):
+        result = generate_counter_offer(categorized, previous_plan, "test")
+
+    assert result.get("fallback") is True
+    assert "error" in result
+    assert result["cuts"] == {"food": 50}
+
+
+def test_generate_counter_offer_api_status_error_returns_fallback():
+    """Non-200 status code raises QwenAPIError, caught by except."""
+    categorized = {"essential": {}, "discretionary": {}, "total": 500}
+    previous_plan = {"cuts": {}, "savings": 0}
+
+    mock_response = MagicMock()
+    mock_response.status_code = 429
+    mock_response.output.text = ""
+
+    with patch("src.negotiation.Generation.call", return_value=mock_response):
+        result = generate_counter_offer(categorized, previous_plan, "hello")
+
+    assert result.get("fallback") is True
+
+
+def test_generate_counter_offer_invalid_json_returns_fallback():
+    """Malformed JSON in Qwen response triggers JSONDecodeError → fallback."""
+    categorized = {"essential": {}, "discretionary": {}, "total": 500}
+    previous_plan = {"cuts": {}, "savings": 0}
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.output.text = "not json at all"
+
+    with patch("src.negotiation.Generation.call", return_value=mock_response):
+        result = generate_counter_offer(categorized, previous_plan, "test")
+
+    assert result.get("fallback") is True
 
 
 def test_format_budget_breakdown():

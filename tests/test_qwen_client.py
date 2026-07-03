@@ -1,5 +1,10 @@
 # tests/test_qwen_client.py
-from src.qwen_client import build_prompt, parse_recommendation
+import json
+from unittest.mock import patch, MagicMock
+from src.qwen_client import (
+    build_prompt, parse_recommendation, extract_json_from_response,
+    get_budget_recommendation, QwenAPIError
+)
 from src.models import CategorizedTransactions
 
 
@@ -34,3 +39,109 @@ def test_parse_recommendation():
     assert result.savings == 70
     assert result.cuts["entertainment"] == 40
     assert result.explanation == "Reduce discretionary spending"
+
+
+# --- extract_json_from_response ---
+
+def test_extract_json_from_text_wrapping():
+    raw = 'Here is the plan: {"cuts": {"food": 50}, "savings": 50, "explanation": "Cut food"} hope that helps'
+    result = extract_json_from_response(raw)
+    assert result["savings"] == 50
+
+
+def test_extract_json_no_json_raises():
+    import pytest
+    with pytest.raises(json.JSONDecodeError):
+        extract_json_from_response("no json here at all")
+
+
+def test_extract_json_empty_string_raises():
+    import pytest
+    with pytest.raises(json.JSONDecodeError):
+        extract_json_from_response("")
+
+
+# --- parse_recommendation edge cases ---
+
+def test_parse_recommendation_invalid_json_returns_fallback_plan():
+    result = parse_recommendation("garbage response", 1000)
+    assert result.savings == 0
+    assert result.proposed_spending == 1000
+    assert "Failed to parse" in result.explanation
+
+
+def test_parse_recommendation_missing_fields_uses_defaults():
+    raw = '{"cuts": {}}'
+    result = parse_recommendation(raw, 1500)
+    assert result.savings == 0
+    assert result.cuts == {}
+    assert result.explanation == ""
+
+
+# --- get_budget_recommendation ---
+
+def test_get_budget_recommendation_success():
+    from src.models import CategorizedTransactions
+    cats = CategorizedTransactions(
+        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
+    )
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.output.text = '{"cuts": {"food": 100}, "savings": 100, "explanation": "Cut food"}'
+
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
+        result = get_budget_recommendation(cats, "auto")
+
+    assert result["savings"] == 100
+    assert result["original_spending"] == 1500
+    assert result["proposed_spending"] == 1400
+    assert "essential" in result
+    assert "discretionary" in result
+
+
+def test_get_budget_recommendation_api_error():
+    from src.models import CategorizedTransactions
+    cats = CategorizedTransactions(
+        essential={"rent": 1200}, discretionary={}, total=1200
+    )
+
+    mock_response = MagicMock()
+    mock_response.status_code = 500
+
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
+        import pytest
+        with pytest.raises(QwenAPIError):
+            get_budget_recommendation(cats, "auto")
+
+
+def test_get_budget_recommendation_with_numeric_goal():
+    from src.models import CategorizedTransactions
+    cats = CategorizedTransactions(
+        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
+    )
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.output.text = '{"cuts": {"food": 100}, "savings": 100, "explanation": "Cut food"}'
+
+    with patch("src.qwen_client.Generation.call", return_value=mock_response):
+        result = get_budget_recommendation(cats, 200)
+
+    assert result["savings"] == 100
+
+
+def test_build_prompt_auto_goal():
+    from src.models import CategorizedTransactions
+    cats = CategorizedTransactions(
+        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
+    )
+    prompt = build_prompt(cats, "auto")
+    assert "save as much as possible" in prompt.lower()
+
+
+def test_build_prompt_numeric_goal():
+    from src.models import CategorizedTransactions
+    cats = CategorizedTransactions(
+        essential={"rent": 1200}, discretionary={"food": 300}, total=1500
+    )
+    prompt = build_prompt(cats, 250)
+    assert "$250" in prompt

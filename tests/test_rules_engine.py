@@ -1,5 +1,6 @@
 # tests/test_rules_engine.py
-from src.rules_engine import parse_transactions, categorize_transactions
+import pytest
+from src.rules_engine import parse_transactions, categorize_transactions, validate_transactions, ValidationError
 
 
 def test_parse_transactions_from_dicts():
@@ -34,3 +35,83 @@ def test_categorize_transactions():
     assert "food" in result.discretionary
     assert "entertainment" in result.discretionary
     assert result.total == 1475.50
+
+
+# --- validate_transactions edge cases ---
+
+@pytest.mark.parametrize("data,match", [
+    (["not a dict", 42], "not a dict"),
+    ([{"category": "food"}], "missing amount"),
+    ([{"amount": "abc", "category": "food"}], "non-numeric"),
+    ([{"amount": -50, "category": "food"}], "negative"),
+], ids=["non-dict", "missing-amount", "non-numeric", "negative"])
+def test_validate_rejects_bad_rows(data, match):
+    with pytest.raises(ValidationError, match=match):
+        validate_transactions(data)
+
+
+def test_validate_mixed_errors_truncates_to_5():
+    bad_rows = [{"amount": "x"} for _ in range(10)]
+    with pytest.raises(ValidationError, match=r"\.\.\.$"):
+        validate_transactions(bad_rows)
+
+
+def test_validate_accepts_zero_amount():
+    result = validate_transactions([{"amount": 0, "category": "free"}])
+    assert len(result) == 1
+
+
+def test_validate_accepts_float_amount():
+    result = validate_transactions([{"amount": 19.99, "category": "food"}])
+    assert result[0]["amount"] == 19.99
+
+
+def test_validate_all_valid_returns_all():
+    data = [{"amount": 10}, {"amount": 20}, {"amount": 30}]
+    result = validate_transactions(data)
+    assert len(result) == 3
+
+
+def test_parse_transactions_uses_validated_data():
+    raw = [
+        {"amount": 100, "category": "rent", "description": "Rent"},
+        {"amount": "bad"},  # will be rejected by validate
+    ]
+    with pytest.raises(ValidationError):
+        parse_transactions(raw)
+
+
+def test_categorize_empty_transactions():
+    result = categorize_transactions([])
+    assert result.total == 0.0
+    assert result.essential == {}
+    assert result.discretionary == {}
+
+
+def test_categorize_case_insensitive():
+    from src.models import Transaction
+    transactions = [
+        Transaction(100, "RENT", "Rent"),
+        Transaction(50, "Food", "Groceries"),
+    ]
+    result = categorize_transactions(transactions)
+    assert "rent" in result.essential
+    assert "food" in result.discretionary
+
+
+def test_categorize_unknown_category_goes_to_discretionary():
+    from src.models import Transaction
+    transactions = [Transaction(30, "crypto", "Bitcoin")]
+    result = categorize_transactions(transactions)
+    assert "crypto" in result.discretionary
+
+
+def test_categorize_sum_multiple_same_category():
+    from src.models import Transaction
+    transactions = [
+        Transaction(100, "food", "Groceries"),
+        Transaction(50, "food", "Snacks"),
+    ]
+    result = categorize_transactions(transactions)
+    assert result.discretionary["food"] == 150
+    assert result.total == 150
