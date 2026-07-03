@@ -1,46 +1,41 @@
-"""
-Rules engine for parsing and categorizing transactions.
-This module handles CSV parsing and transaction categorization.
-"""
+# src/rules_engine.py
 from typing import List, Dict, Any
+from src.models import Transaction, CategorizedTransactions
 
 
-def parse_transactions(transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Parse raw transaction data into a standardized format.
-    
-    Args:
-        transactions: List of raw transaction dictionaries
-        
-    Returns:
-        List of parsed transaction dictionaries
-    """
-    parsed = []
-    for txn in transactions:
-        parsed_txn = {
-            "amount": float(txn.get("amount", 0)),
-            "category": txn.get("category", "uncategorized"),
-            "description": txn.get("description", ""),
-            "date": txn.get("date", ""),
-        }
-        parsed.append(parsed_txn)
-    return parsed
+def parse_transactions(raw_data: List[Dict[str, Any]]) -> List[Transaction]:
+    """Parse raw transaction dicts into Transaction objects."""
+    transactions = []
+    for item in raw_data:
+        transactions.append(Transaction(
+            amount=float(item.get("amount", 0)),
+            category=item.get("category", "uncategorized"),
+            description=item.get("description", "")
+        ))
+    return transactions
 
 
-def categorize_transactions(parsed_transactions: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Group transactions by category.
-    
-    Args:
-        parsed_transactions: List of parsed transaction dictionaries
-        
-    Returns:
-        Dictionary mapping category names to lists of transactions
-    """
-    categorized = {}
-    for txn in parsed_transactions:
-        category = txn["category"]
-        if category not in categorized:
-            categorized[category] = []
-        categorized[category].append(txn)
-    return categorized
+ESSENTIAL_CATEGORIES = {"rent", "utilities", "insurance", "healthcare", "transport"}
+DISCRETIONARY_CATEGORIES = {"food", "entertainment", "dining", "shopping", "personal"}
+
+
+def categorize_transactions(transactions: List[Transaction]) -> CategorizedTransactions:
+    """Categorize transactions into essential vs discretionary."""
+    essential = {}
+    discretionary = {}
+    total = 0.0
+
+    for t in transactions:
+        total += t.amount
+        cat_lower = t.category.lower()
+
+        if cat_lower in ESSENTIAL_CATEGORIES:
+            essential[cat_lower] = essential.get(cat_lower, 0) + t.amount
+        else:
+            discretionary[cat_lower] = discretionary.get(cat_lower, 0) + t.amount
+
+    return CategorizedTransactions(
+        essential=essential,
+        discretionary=discretionary,
+        total=total
+    )
