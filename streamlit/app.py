@@ -22,6 +22,8 @@ if "current_plan" not in st.session_state:
     st.session_state.current_plan = None
 if "categorized" not in st.session_state:
     st.session_state.categorized = None
+if "plan_finalized" not in st.session_state:
+    st.session_state.plan_finalized = False
 
 # FC endpoint
 FC_ENDPOINT = os.environ.get("FC_ENDPOINT", "https://your-fc-endpoint.cn-hangzhou.fc.aliyuncs.com")
@@ -144,6 +146,7 @@ if user_input:
 
     if user_input.lower() in ["analyze", "start", "begin"]:
         # Trigger initial analysis
+        st.session_state.plan_finalized = False
         if input_method == "Upload CSV" and uploaded_file:
             transactions = df.to_dict("records")
         else:
@@ -153,7 +156,7 @@ if user_input:
         result = analyze_budget(transactions)
 
         if "error" in result:
-            response = f"Error: {result['error']}"
+            response = "Something went wrong processing your budget. Please try again."
         else:
             st.session_state.current_plan = result
             st.session_state.categorized = {
@@ -171,8 +174,17 @@ if user_input:
             user_objection=user_input
         )
 
+        # Sanity check for ambiguous input responses
+        if "error" not in result:
+            original = st.session_state.categorized.get("total", 0)
+            savings = result.get("savings", 0)
+            proposed = result.get("proposed_spending", 0)
+            if savings > original or proposed < 0:
+                result = st.session_state.current_plan
+                st.warning("The AI's response didn't make sense. Showing your previous plan.")
+
         if "error" in result:
-            response = f"Error: {result['error']}"
+            response = "Something went wrong processing your budget. Please try again."
         else:
             st.session_state.current_plan = result
             response = format_response(result)
@@ -181,6 +193,24 @@ if user_input:
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     st.rerun()
+
+# Accept button (root level, after message loop)
+if st.session_state.current_plan and not st.session_state.get('plan_finalized', False):
+    if st.button("✓ Accept this budget plan"):
+        st.session_state.plan_finalized = True
+        st.rerun()
+
+# Accepted state display + reset
+if st.session_state.get('plan_finalized', False):
+    st.success("Budget plan accepted!")
+    plan = st.session_state.current_plan
+    st.markdown(f"**Final savings:** ${plan.get('savings', 0):,.2f}/mo")
+    st.markdown(f"**Proposed budget:** ${plan.get('proposed_spending', 0):,.2f}/mo")
+    if st.button("Start New Analysis"):
+        st.session_state.plan_finalized = False
+        st.session_state.current_plan = None
+        st.session_state.messages = []
+        st.rerun()
 
 # Chart at root level — persists across reruns
 if st.session_state.current_plan:
