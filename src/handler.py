@@ -5,6 +5,7 @@ Demonstrates real Qwen Cloud API usage for budget negotiation.
 import os
 import json
 import hmac
+import logging
 import dashscope
 from src.rules_engine import parse_transactions, categorize_transactions, ValidationError
 from src.qwen_client import get_budget_recommendation, QwenAPIError
@@ -107,8 +108,8 @@ def handler(event, context):
             "statusCode": 502,
             "body": json.dumps({"error": "Qwen API is currently unavailable, please try again"})
         }
-    except Exception as e:
-        print(f"Unhandled error: {e}")
+    except Exception:
+        logging.exception("Unhandled error in handler")
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Internal server error"})

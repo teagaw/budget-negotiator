@@ -8,7 +8,7 @@
 
 ## 0:45-1:30 — Live demo (initial analysis)
 [Show CSV upload → analysis → budget proposal]
-"Here's a middle-class profile spending $1,580 a month. The agent proposes cutting entertainment by $40 and dining by $30."
+"Here's a middle-class profile spending $2,180 a month. The agent proposes cutting entertainment by $40 and dining by $30."
 [Show the budget breakdown with savings highlighted]
 
 ## 1:30-1:50 — Accept checkpoint

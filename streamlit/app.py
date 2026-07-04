@@ -53,7 +53,7 @@ with st.sidebar:
     else:
         demo_profile = st.selectbox(
             "Choose a demo profile",
-            ["Middle Class ($1,580/mo)", "Young Professional ($1,740/mo)"]
+            ["Middle Class ($2,180/mo)", "Young Professional ($1,740/mo)"]
         )
 
     FC_ENDPOINT = st.text_input(

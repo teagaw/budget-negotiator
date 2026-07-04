@@ -86,7 +86,7 @@ def _call_qwen_with_retry(
     messages: list,
     temperature: float = 0.7,
     max_tokens: int = 1000,
-    timeout: int = 30,
+    timeout: int = 15,
 ):
     """Call Generation.call() with a single retry on transient errors."""
     response = Generation.call(

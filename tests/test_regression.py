@@ -123,7 +123,7 @@ def test_negotiation_api_error_returns_fallback():
     categorized = {"essential": {"rent": 1200}, "discretionary": {}, "total": 1200}
     previous_plan = {"cuts": {"food": 50}, "savings": 50, "explanation": "Initial"}
 
-    with patch("src.negotiation._call_qwen_negotiation", side_effect=QwenAPIError("timeout")):
+    with patch("src.qwen_client.Generation.call", side_effect=QwenAPIError("timeout")):
         result = generate_counter_offer(categorized, previous_plan, "test")
 
     assert result.get("fallback") is True

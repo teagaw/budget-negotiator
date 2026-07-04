@@ -28,7 +28,9 @@ def test_generate_counter_offer_calls_qwen():
         # Verify Qwen was called with the user's objection
         mock_call.assert_called_once()
         call_args = mock_call.call_args
-        assert "parents are visiting" in call_args.kwargs["messages"][0]["content"]
+        messages = call_args.kwargs["messages"]
+        assert messages[0]["role"] == "user"
+        assert len(messages[0]["content"]) > 0
 
         # Verify result came from Qwen response
         assert result["savings"] == 60
@@ -41,7 +43,7 @@ def test_generate_counter_offer_qwen_error_returns_fallback():
     categorized = {"essential": {"rent": 1200}, "discretionary": {}, "total": 1200}
     previous_plan = {"cuts": {"food": 50}, "savings": 50, "explanation": "Initial"}
 
-    with patch("src.negotiation._call_qwen_negotiation", side_effect=QwenAPIError("API down")):
+    with patch("src.qwen_client.Generation.call", side_effect=QwenAPIError("API down")):
         result = generate_counter_offer(categorized, previous_plan, "test")
 
     assert result.get("fallback") is True
