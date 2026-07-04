@@ -124,19 +124,22 @@ def test_handler_invalid_json_returns_400():
     assert "Invalid JSON" in json.loads(result["body"])["error"]
 
 
-def test_handler_validation_error_returns_500():
+def test_handler_validation_error_returns_400():
     event = {"body": json.dumps({"transactions": [{"amount": -5}]})}
     result = handler(event, {})
-    assert result["statusCode"] == 500
-    assert "Internal server error" in json.loads(result["body"])["error"]
+    assert result["statusCode"] == 400
+    body = json.loads(result["body"])
+    assert "error" in body
+    assert "Internal server error" not in body["error"]
 
 
-def test_handler_qwen_api_error_returns_500():
+def test_handler_qwen_api_error_returns_502():
     event = {"body": json.dumps({"transactions": [{"amount": 100, "category": "food"}]})}
     with patch("src.handler.get_budget_recommendation", side_effect=QwenAPIError("API down")):
         result = handler(event, {})
-    assert result["statusCode"] == 500
-    assert "Internal server error" in json.loads(result["body"])["error"]
+    assert result["statusCode"] == 502
+    body = json.loads(result["body"])
+    assert "Qwen API" in body["error"] or "unavailable" in body["error"]
 
 
 def test_handler_unknown_exception_returns_500():

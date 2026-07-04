@@ -39,26 +39,43 @@ def test_negotiate_response_shape_matches_handler():
 
 # ============================================================
 # BUG-R2: handler leaks raw exception messages to client
-# Bug: handler returned str(e) which exposed internal paths/API keys.
-# Fixed by returning generic "Internal server error" for all cases.
+# Fix: ValidationError returns 400 + detail (user-actionable),
+#       QwenAPIError returns 502 + friendly retry message,
+#       runtime/value errors return generic 500.
 # ============================================================
 
+
+def test_validation_error_returns_400_with_detail():
+    """BUG-R2: ValidationError exposes row-level detail at 400."""
+    event = {"body": json.dumps({"transactions": [{"amount": 100, "category": "food"}]})}
+    with patch("src.handler.get_budget_recommendation", side_effect=ValidationError("bad data")):
+        result = handler(event, {})
+    body = json.loads(result["body"])
+    assert result["statusCode"] == 400
+    assert "bad data" in body["error"]
+
+
+def test_qwen_api_error_returns_502_with_retry_msg():
+    """BUG-R2: QwenAPIError returns 502 with friendly retry message."""
+    event = {"body": json.dumps({"transactions": [{"amount": 100, "category": "food"}]})}
+    with patch("src.handler.get_budget_recommendation", side_effect=QwenAPIError("API down")):
+        result = handler(event, {})
+    body = json.loads(result["body"])
+    assert result["statusCode"] == 502
+    assert "Qwen API" in body["error"] or "unavailable" in body["error"]
+
+
 @pytest.mark.parametrize("error_cls,args", [
-    (ValidationError, ["bad data"]),
-    (QwenAPIError, ["API down"]),
     (RuntimeError, ["unexpected crash"]),
     (ValueError, ["something weird"]),
-], ids=["validation", "qwen-api", "runtime", "value"])
-def test_error_messages_never_leak_to_client(error_cls, args):
-    """BUG-R2: all errors return identical generic message, no internals."""
+], ids=["runtime", "value"])
+def test_unknown_errors_return_generic_500(error_cls, args):
+    """BUG-R2: runtime/value errors return generic message, no internals."""
     event = {"body": json.dumps({"transactions": [{"amount": 100, "category": "food"}]})}
-
     with patch("src.handler.get_budget_recommendation", side_effect=error_cls(*args)):
         result = handler(event, {})
-
     body = json.loads(result["body"])
     assert body["error"] == "Internal server error"
-    # Must NOT contain exception text, file paths, or API details
     assert args[0] not in body["error"]
 
 

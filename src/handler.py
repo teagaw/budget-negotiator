@@ -82,12 +82,18 @@ def handler(event, context):
             "statusCode": 400,
             "body": json.dumps({"error": "Invalid JSON in request body"})
         }
-    except (ValidationError, QwenAPIError):
+    except ValidationError as e:
         return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Internal server error"})
+            "statusCode": 400,
+            "body": json.dumps({"error": str(e)})
         }
-    except Exception:
+    except QwenAPIError:
+        return {
+            "statusCode": 502,
+            "body": json.dumps({"error": "Qwen API is currently unavailable, please try again"})
+        }
+    except Exception as e:
+        print(f"Unhandled error: {e}")
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Internal server error"})
