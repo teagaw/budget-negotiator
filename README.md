@@ -39,12 +39,34 @@ AI-powered budget analysis and negotiation agent. Upload your spending data, and
 
 ## Deployment
 
-Deployed on Alibaba Cloud Function Compute.
-See `src/handler.py` for the FC entry point.
+Deploy to Alibaba Cloud Function Compute via Serverless Devs:
+
+```bash
+# 1. Install Serverless Devs CLI (if not installed)
+npm install -g @serverless-devs/s
+
+# 2. Configure Alibaba Cloud access
+s config add
+
+# 3. Set environment variables
+export DASHSCOPE_API_KEY=sk-your-key
+export FUNCTION_API_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+
+# 4. Deploy
+s deploy --local
+
+# 5. Test the deployed endpoint
+curl -X POST https://<your-fc-endpoint>/budget-negotiator \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $FUNCTION_API_KEY" \
+  -d '{"action":"analyze","transactions":[{"amount":1200,"category":"rent"}]}'
+```
 
 **Authentication**: The FC endpoint uses shared-secret auth via the `X-API-Key` header.
 Set `FUNCTION_API_KEY` in your FC console environment (or `.env` for local dev).
 When `FUNCTION_API_KEY` is empty, auth is skipped (local dev mode).
+
+**Runtime**: Python 3.10 · 128MB memory · 60s timeout
 
 ## Demo Data
 

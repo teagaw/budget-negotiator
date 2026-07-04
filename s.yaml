@@ -1,0 +1,19 @@
+edition: 3.0.0
+name: budget-negotiator-app
+access: default
+
+resources:
+  budget-negotiator:
+    component: fc3
+    props:
+      region: cn-hangzhou
+      functionName: budget-negotiator
+      description: Budget Negotiator AI - hybrid reasoning agent for Alibaba Cloud hackathon
+      runtime: python3.10
+      handler: src/handler.handler
+      timeout: 60
+      memorySize: 128
+      diskSize: 512
+      environmentVariables:
+        DASHSCOPE_API_KEY: <set via: s deploy --env DASHSCOPE_API_KEY=sk-xxx>
+        FUNCTION_API_KEY: <set via: s deploy --env FUNCTION_API_KEY=your-secret>
