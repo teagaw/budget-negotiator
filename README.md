@@ -35,12 +35,16 @@ AI-powered budget analysis and negotiation agent. Upload your spending data, and
 
 ## Tests
 
-70 tests · 100% coverage — `pytest tests/`
+77 tests · 100% coverage — `pytest tests/`
 
 ## Deployment
 
 Deployed on Alibaba Cloud Function Compute.
 See `src/handler.py` for the FC entry point.
+
+**Authentication**: The FC endpoint uses shared-secret auth via the `X-API-Key` header.
+Set `FUNCTION_API_KEY` in your FC console environment (or `.env` for local dev).
+When `FUNCTION_API_KEY` is empty, auth is skipped (local dev mode).
 
 ## Demo Data
 

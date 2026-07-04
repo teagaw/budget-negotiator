@@ -4,6 +4,7 @@ Demonstrates real Qwen Cloud API usage for budget negotiation.
 """
 import os
 import json
+import hmac
 import dashscope
 from src.rules_engine import parse_transactions, categorize_transactions, ValidationError
 from src.qwen_client import get_budget_recommendation, QwenAPIError
@@ -11,6 +12,9 @@ from src.negotiation import generate_counter_offer
 
 # Load API key from environment (set in FC console or .env for local)
 dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+
+# Shared-secret auth key (set in FC console env, never hardcoded)
+FUNCTION_API_KEY = os.environ.get("FUNCTION_API_KEY", "")
 
 
 def _handle_analyze(body: dict) -> dict:
@@ -63,6 +67,15 @@ def handler(event, context):
     FC HTTP trigger handler.
     Receives spending data + chat history, returns budget negotiation response.
     """
+    # Shared-secret auth — reject before any parsing or Qwen calls
+    headers = event.get("headers", {}) or {}
+    provided_key = headers.get("x-api-key", "") or headers.get("X-API-Key", "")
+    if FUNCTION_API_KEY and not hmac.compare_digest(provided_key, FUNCTION_API_KEY):
+        return {
+            "statusCode": 401,
+            "body": json.dumps({"error": "Unauthorized"})
+        }
+
     try:
         body = json.loads(event.get("body", "{}"))
         action = body.get("action", "analyze")

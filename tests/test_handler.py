@@ -161,3 +161,54 @@ def test_handler_missing_body_key():
     event = {}
     result = handler(event, {})
     assert result["statusCode"] == 400
+
+
+# --- Auth tests ---
+
+@pytest.mark.parametrize("headers,description", [
+    (None, "missing headers entirely"),
+    ({}, "empty headers"),
+    ({"X-API-Key": ""}, "empty key"),
+    ({"X-API-Key": "wrong-key"}, "wrong key"),
+    ({"x-api-key": "wrong-key"}, "lowercase header, wrong key"),
+], ids=["no-headers", "empty-headers", "empty-key", "wrong-key", "lowercase-wrong"])
+@patch("src.handler.FUNCTION_API_KEY", "test-secret-key")
+def test_handler_unauthorized_returns_401(headers, description):
+    """Auth: missing or wrong X-API-Key is rejected before any business logic runs."""
+    event = {
+        "body": json.dumps({"action": "analyze", "transactions": [{"amount": 100, "category": "food"}]}),
+        "headers": headers
+    }
+    # If business logic runs, this mock will fail the test
+    with patch("src.handler.get_budget_recommendation", side_effect=AssertionError("business logic should not run")):
+        result = handler(event, {})
+    assert result["statusCode"] == 401
+    assert "Unauthorized" in json.loads(result["body"])["error"]
+
+
+@patch("src.handler.FUNCTION_API_KEY", "test-secret-key")
+def test_handler_authorized_request_passes_through():
+    """Auth: correct X-API-Key reaches business logic."""
+    event = {
+        "body": json.dumps({"action": "analyze", "transactions": [{"amount": 100, "category": "food"}]}),
+        "headers": {"X-API-Key": "test-secret-key"}
+    }
+    mock_rec = {"savings": 50, "proposed_spending": 50, "original_spending": 100,
+                "cuts": {}, "explanation": "Cut", "essential": {}, "discretionary": {}}
+    with patch("src.handler.get_budget_recommendation", return_value=mock_rec):
+        result = handler(event, {})
+    assert result["statusCode"] == 200
+
+
+@patch("src.handler.FUNCTION_API_KEY", "")
+def test_handler_no_auth_config_skips_check():
+    """Auth: when FUNCTION_API_KEY is empty, auth check is skipped (local dev)."""
+    event = {
+        "body": json.dumps({"action": "analyze", "transactions": [{"amount": 100, "category": "food"}]}),
+        "headers": {}
+    }
+    mock_rec = {"savings": 50, "proposed_spending": 50, "original_spending": 100,
+                "cuts": {}, "explanation": "Cut", "essential": {}, "discretionary": {}}
+    with patch("src.handler.get_budget_recommendation", return_value=mock_rec):
+        result = handler(event, {})
+    assert result["statusCode"] == 200

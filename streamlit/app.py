@@ -30,6 +30,7 @@ GENERIC_ERROR_MSG = "Something went wrong processing your budget. Please try aga
 
 # FC endpoint
 FC_ENDPOINT = os.environ.get("FC_ENDPOINT", "https://your-fc-endpoint.cn-hangzhou.fc.aliyuncs.com")
+FC_API_KEY = os.environ.get("FUNCTION_API_KEY", "")
 
 # Sidebar — data input
 with st.sidebar:
@@ -84,6 +85,7 @@ def analyze_budget(transactions: list, goal: str = "auto"):
         response = requests.post(
             FC_ENDPOINT,
             json={"action": "analyze", "transactions": transactions, "savings_goal": goal},
+            headers={"X-API-Key": FC_API_KEY},
             timeout=70
         )
         return response.json()
@@ -104,6 +106,7 @@ def negotiate_budget(categorized: dict, previous_plan: dict, user_objection: str
                 "previous_plan": previous_plan,
                 "user_objection": user_objection
             },
+            headers={"X-API-Key": FC_API_KEY},
             timeout=70
         )
         return response.json()
