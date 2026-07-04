@@ -172,7 +172,7 @@ def test_handler_missing_body_key():
     ({"X-API-Key": "wrong-key"}, "wrong key"),
     ({"x-api-key": "wrong-key"}, "lowercase header, wrong key"),
 ], ids=["no-headers", "empty-headers", "empty-key", "wrong-key", "lowercase-wrong"])
-@patch("src.handler.FUNCTION_API_KEY", "test-secret-key")
+@patch("src.handler._get_function_api_key", new=lambda: "test-secret-key")
 def test_handler_unauthorized_returns_401(headers, description):
     """Auth: missing or wrong X-API-Key is rejected before any business logic runs."""
     event = {
@@ -186,7 +186,7 @@ def test_handler_unauthorized_returns_401(headers, description):
     assert "Unauthorized" in json.loads(result["body"])["error"]
 
 
-@patch("src.handler.FUNCTION_API_KEY", "test-secret-key")
+@patch("src.handler._get_function_api_key", new=lambda: "test-secret-key")
 def test_handler_authorized_request_passes_through():
     """Auth: correct X-API-Key reaches business logic."""
     event = {
@@ -200,7 +200,7 @@ def test_handler_authorized_request_passes_through():
     assert result["statusCode"] == 200
 
 
-@patch("src.handler.FUNCTION_API_KEY", "")
+@patch("src.handler._get_function_api_key", new=lambda: "")
 def test_handler_no_auth_config_skips_check():
     """Auth: when FUNCTION_API_KEY is empty, auth check is skipped (local dev)."""
     event = {

@@ -13,8 +13,9 @@ from src.negotiation import generate_counter_offer
 # Load API key from environment (set in FC console or .env for local)
 dashscope.api_key = os.environ.get("DASHSCOPE_API_KEY", "")
 
-# Shared-secret auth key (set in FC console env, never hardcoded)
-FUNCTION_API_KEY = os.environ.get("FUNCTION_API_KEY", "")
+def _get_function_api_key():
+    """Shared-secret auth key (set in FC console env, never hardcoded)."""
+    return os.environ.get("FUNCTION_API_KEY", "")
 
 
 def _handle_analyze(body: dict) -> dict:
@@ -70,7 +71,8 @@ def handler(event, context):
     # Shared-secret auth — reject before any parsing or Qwen calls
     headers = event.get("headers", {}) or {}
     provided_key = headers.get("x-api-key", "") or headers.get("X-API-Key", "")
-    if FUNCTION_API_KEY and not hmac.compare_digest(provided_key, FUNCTION_API_KEY):
+    api_key = _get_function_api_key()
+    if api_key and not hmac.compare_digest(provided_key, api_key):
         return {
             "statusCode": 401,
             "body": json.dumps({"error": "Unauthorized"})
