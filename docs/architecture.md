@@ -29,7 +29,7 @@ graph LR
 - Serverless backend for agent logic
 - Python runtime with Qwen API integration
 - Entry point: handler.py
-- **Live endpoint:** (insert URL after deployment)
+- **Live endpoint:** *(deploy then paste URL here)*
 
 ### Rules Engine
 - CSV parsing and validation
@@ -59,6 +59,6 @@ graph LR
 
 ## Error Handling
 
-- Malformed CSV → structured error response
-- Qwen API timeout → fallback to previous plan
-- Invalid input → validation before processing
+- Malformed CSV → validation error with row-level detail
+- Qwen API timeout → 502 error (initial) / fallback to previous plan (negotiation)
+- Invalid input → validation error before processing
